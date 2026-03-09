@@ -5,7 +5,8 @@ import useRundown from '../../../common/hooks-query/useRundown';
 import { useEventSelection } from '../useEventSelection';
 
 import EventEditorFooter from './composite/EventEditorFooter';
-import { useMultiEventMerge } from './multi-edit/useMultiEventMerge';
+import { findFirstRundownEventId } from './multi-edit/multiEditUtils';
+import { useSelectedEvents } from './multi-edit/useMultiEventMerge';
 import EventEditor from './EventEditor';
 import EventEditorEmpty from './EventEditorEmpty';
 import GroupEditor from './GroupEditor';
@@ -14,29 +15,39 @@ import MilestoneEditor from './MilestoneEditor';
 import style from './EntryEditor.module.scss';
 
 export default function RundownEntryEditor() {
-  const selectedEvents = useEventSelection((state) => state.selectedEvents);
+  const selectedEventIds = useEventSelection((state) => state.selectedEvents);
   const { data } = useRundown();
-  const { merged, selectedIds } = useMultiEventMerge();
+  const { selectedEvents, selectedIds, isMultiSelect } = useSelectedEvents();
 
   const entry = useMemo<OntimeEntry | null>(() => {
     if (data.order.length === 0) {
       return null;
     }
 
-    const selectedEventId = Array.from(selectedEvents).at(0);
+    const selectedEventId = Array.from(selectedEventIds).at(0);
     if (!selectedEventId) {
       return null;
     }
 
     const event = data.entries[selectedEventId];
     return event ?? null;
-  }, [data.order.length, data.entries, selectedEvents]);
+  }, [data.order.length, data.entries, selectedEventIds]);
 
-  // Multi-edit: render unified EventEditor with merged data
-  if (selectedEvents.size > 1 && merged && entry && isOntimeEvent(entry)) {
+  const firstRundownEventId = useMemo(
+    () => findFirstRundownEventId(data.entries, data.flatOrder),
+    [data.entries, data.flatOrder],
+  );
+
+  // Multi-edit: render unified EventEditor with selected events
+  if (isMultiSelect && entry && isOntimeEvent(entry)) {
     return (
       <div className={style.rundownEditor} data-testid='editor-container'>
-        <EventEditor event={entry} multiEdit={{ merged, selectedIds }} />
+        <EventEditor
+          event={entry}
+          selectedEvents={selectedEvents}
+          selectedIds={selectedIds}
+          firstRundownEventId={firstRundownEventId}
+        />
         <EventEditorFooter selectedCount={selectedIds.length} />
       </div>
     );

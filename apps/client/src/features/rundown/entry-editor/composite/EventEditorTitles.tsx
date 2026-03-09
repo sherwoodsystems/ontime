@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
+import { OntimeEvent } from 'ontime-types';
 import { sanitiseCue } from 'ontime-utils';
 
 import * as Editor from '../../../../common/components/editor-utils/EditorUtils';
@@ -6,18 +7,12 @@ import SwatchSelect from '../../../../common/components/input/colour-input/Swatc
 import Input from '../../../../common/components/input/input/Input';
 import Switch from '../../../../common/components/switch/Switch';
 import { useEntryActionsContext } from '../../../../common/context/EntryActionsContext';
-import { BooleanTally, switchLabel } from '../multi-edit/multiEditUtils';
+import { booleanTally, isIndeterminate, mergeField, switchLabel } from '../multi-edit/multiEditUtils';
 
 import EventTextArea from './EventTextArea';
 import EntryEditorTextInput from './EventTextInput';
 
 import style from '../EntryEditor.module.scss';
-
-interface EventEditorTitlesMultiEdit {
-  flagIndeterminate: boolean;
-  flagTally: BooleanTally;
-  colourIndeterminate: boolean;
-}
 
 interface EventEditorTitlesProps {
   eventId: string;
@@ -26,10 +21,8 @@ interface EventEditorTitlesProps {
   title: string;
   note: string;
   colour: string;
-  titlePlaceholder?: string;
-  notePlaceholder?: string;
   onSubmit?: (field: string, value: string | boolean) => void;
-  multiEdit?: EventEditorTitlesMultiEdit;
+  selectedEvents?: OntimeEvent[];
 }
 
 export default memo(EventEditorTitles);
@@ -40,12 +33,35 @@ function EventEditorTitles({
   title,
   note,
   colour,
-  titlePlaceholder,
-  notePlaceholder,
   onSubmit: onSubmitProp,
-  multiEdit,
+  selectedEvents,
 }: EventEditorTitlesProps) {
   const { updateEntry } = useEntryActionsContext();
+
+  const isMulti = selectedEvents != null && selectedEvents.length > 1;
+
+  const merged = useMemo(() => {
+    if (!isMulti) return null;
+    return {
+      title: mergeField(selectedEvents, 'title'),
+      note: mergeField(selectedEvents, 'note'),
+      colour: mergeField(selectedEvents, 'colour'),
+      flag: mergeField(selectedEvents, 'flag'),
+      flagTally: booleanTally(selectedEvents, 'flag'),
+    };
+  }, [isMulti, selectedEvents]);
+
+  const flagIndeterminate = merged ? isIndeterminate(merged.flag) : false;
+  const colourIndeterminate = merged ? isIndeterminate(merged.colour) : false;
+  const titleIndeterminate = merged ? isIndeterminate(merged.title) : false;
+  const noteIndeterminate = merged ? isIndeterminate(merged.note) : false;
+
+  const displayTitle = titleIndeterminate ? '' : title;
+  const titlePlaceholder = titleIndeterminate ? 'multiple' : undefined;
+  const displayNote = noteIndeterminate ? '' : note;
+  const notePlaceholder = noteIndeterminate ? 'multiple' : undefined;
+  const displayColour = colourIndeterminate ? '' : colour;
+  const displayFlag = flagIndeterminate && merged ? merged.flagTally.majority : flag;
 
   const submit = (field: string, value: string | boolean) => {
     if (onSubmitProp) {
@@ -64,18 +80,12 @@ function EventEditorTitles({
   };
 
   const flagSubmitHandler = (newValue: boolean) => {
-    if (multiEdit?.flagIndeterminate) {
-      submit('flag', multiEdit.flagTally.majority);
+    if (flagIndeterminate && merged) {
+      submit('flag', merged.flagTally.majority);
     } else {
       submit('flag', newValue);
     }
   };
-
-  const textSubmitHandler = (field: string, newValue: string) => {
-    submit(field, newValue);
-  };
-
-  const isMulti = !!multiEdit;
 
   return (
     <div className={style.column}>
@@ -104,24 +114,24 @@ function EventEditorTitles({
           <Editor.Label className={style.switchLabel}>
             <Switch
               id='flag'
-              checked={flag}
+              checked={displayFlag}
               onCheckedChange={flagSubmitHandler}
-              indeterminate={multiEdit?.flagIndeterminate}
+              indeterminate={flagIndeterminate}
             />
-            {multiEdit
-              ? switchLabel(multiEdit.flagTally, multiEdit.flagIndeterminate, flag)
-              : flag
+            {merged
+              ? switchLabel(merged.flagTally, flagIndeterminate, displayFlag)
+              : displayFlag
                 ? 'On'
                 : 'Off'}
           </Editor.Label>
         </div>
       </div>
       <div>
-        <Editor.Label>Colour {multiEdit?.colourIndeterminate && <span className={style.hint}>(multiple selected)</span>}</Editor.Label>
-        <SwatchSelect name='colour' value={colour} handleChange={textSubmitHandler} />
+        <Editor.Label>Colour {colourIndeterminate && <span className={style.hint}>(multiple selected)</span>}</Editor.Label>
+        <SwatchSelect name='colour' value={displayColour} handleChange={submit} />
       </div>
-      <EntryEditorTextInput field='title' label='Title' initialValue={title} placeholder={titlePlaceholder} submitHandler={textSubmitHandler} />
-      <EventTextArea field='note' label='Note' initialValue={note} placeholder={notePlaceholder} submitHandler={textSubmitHandler} />
+      <EntryEditorTextInput field='title' label='Title' initialValue={displayTitle} placeholder={titlePlaceholder} submitHandler={submit} />
+      <EventTextArea field='note' label='Note' initialValue={displayNote} placeholder={notePlaceholder} submitHandler={submit} />
     </div>
   );
 }

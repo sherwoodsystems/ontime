@@ -1,6 +1,6 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { IoInformationCircle } from 'react-icons/io5';
-import { EndAction, TimerType, TimeStrategy } from 'ontime-types';
+import { EndAction, OntimeEvent, TimerType, TimeStrategy } from 'ontime-types';
 import { millisToString, parseUserTime } from 'ontime-utils';
 
 import * as Editor from '../../../../common/components/editor-utils/EditorUtils';
@@ -11,29 +11,15 @@ import Tooltip from '../../../../common/components/tooltip/Tooltip';
 import { useEntryActionsContext } from '../../../../common/context/EntryActionsContext';
 import { millisToDelayString } from '../../../../common/utils/dateConfig';
 import TimeInputFlow from '../../time-input-flow/TimeInputFlow';
-import { BooleanTally, switchLabel } from '../multi-edit/multiEditUtils';
+import { booleanTally, isIndeterminate, mergeField, switchLabel } from '../multi-edit/multiEditUtils';
 
 import style from '../EntryEditor.module.scss';
-
-interface EventEditorTimesMultiEdit {
-  endActionIndeterminate: boolean;
-  countToEndIndeterminate: boolean;
-  countToEndTally: BooleanTally;
-  timerTypeIndeterminate: boolean;
-  timeWarningIndeterminate: boolean;
-  timeDangerIndeterminate: boolean;
-  // TimeInputFlow passthrough
-  linkStartIndeterminate: boolean;
-  durationLockIndeterminate: boolean;
-  allLockDuration: boolean;
-  allLockEnd: boolean;
-}
 
 interface EventEditorTimesProps {
   eventId: string;
   timeStart: number;
   timeEnd: number;
-  duration?: number;
+  duration: number;
   timeStrategy: TimeStrategy;
   linkStart: boolean;
   countToEnd: boolean;
@@ -43,7 +29,8 @@ interface EventEditorTimesProps {
   timeWarning: number;
   timeDanger: number;
   onSubmit?: (field: string, value: string | boolean) => void;
-  multiEdit?: EventEditorTimesMultiEdit;
+  selectedEvents?: OntimeEvent[];
+  firstRundownEventId?: string;
   onStrategyChange?: (strategy: TimeStrategy) => void;
 }
 
@@ -64,10 +51,31 @@ function EventEditorTimes({
   timeWarning,
   timeDanger,
   onSubmit: onSubmitProp,
-  multiEdit,
+  selectedEvents,
+  firstRundownEventId,
   onStrategyChange,
 }: EventEditorTimesProps) {
   const { updateEntry } = useEntryActionsContext();
+
+  const isMulti = selectedEvents != null && selectedEvents.length > 1;
+
+  const merged = useMemo(() => {
+    if (!isMulti) return null;
+    return {
+      endAction: mergeField(selectedEvents, 'endAction'),
+      countToEnd: mergeField(selectedEvents, 'countToEnd'),
+      timerType: mergeField(selectedEvents, 'timerType'),
+      timeWarning: mergeField(selectedEvents, 'timeWarning'),
+      timeDanger: mergeField(selectedEvents, 'timeDanger'),
+      countToEndTally: booleanTally(selectedEvents, 'countToEnd'),
+    };
+  }, [isMulti, selectedEvents]);
+
+  const endActionIndeterminate = merged ? isIndeterminate(merged.endAction) : false;
+  const countToEndIndeterminate = merged ? isIndeterminate(merged.countToEnd) : false;
+  const timerTypeIndeterminate = merged ? isIndeterminate(merged.timerType) : false;
+  const timeWarningIndeterminate = merged ? isIndeterminate(merged.timeWarning) : false;
+  const timeDangerIndeterminate = merged ? isIndeterminate(merged.timeDanger) : false;
 
   const handleSubmit = (field: HandledActions, value: string | boolean) => {
     if (onSubmitProp) {
@@ -100,14 +108,14 @@ function EventEditorTimes({
     : '';
 
   const endActionOptions = [
-    ...(multiEdit?.endActionIndeterminate ? [{ value: null, label: 'Mixed' }] : []),
+    ...(endActionIndeterminate ? [{ value: null, label: 'Mixed' }] : []),
     { value: EndAction.None, label: 'None' },
     { value: EndAction.LoadNext, label: 'Load next event' },
     { value: EndAction.PlayNext, label: 'Play next event' },
   ];
 
   const timerTypeOptions = [
-    ...(multiEdit?.timerTypeIndeterminate ? [{ value: null, label: 'Mixed' }] : []),
+    ...(timerTypeIndeterminate ? [{ value: null, label: 'Mixed' }] : []),
     { value: TimerType.CountDown, label: 'Count down' },
     { value: TimerType.CountUp, label: 'Count up' },
     { value: TimerType.Clock, label: 'Clock' },
@@ -131,20 +139,12 @@ function EventEditorTimes({
               countToEnd={countToEnd}
               showLabels
               handleSubmit={onSubmitProp}
-              multiEdit={
-                multiEdit
-                  ? {
-                      linkStartIndeterminate: multiEdit.linkStartIndeterminate,
-                      durationLockIndeterminate: multiEdit.durationLockIndeterminate,
-                      allLockDuration: multiEdit.allLockDuration,
-                      allLockEnd: multiEdit.allLockEnd,
-                    }
-                  : undefined
-              }
+              selectedEvents={selectedEvents}
+              firstRundownEventId={firstRundownEventId}
               onStrategyChange={onStrategyChange}
             />
           </div>
-          <div className={style.delayLabel}>{!multiEdit ? delayLabel : ''}</div>
+          <div className={style.delayLabel}>{!isMulti ? delayLabel : ''}</div>
         </div>
       </div>
 
@@ -154,7 +154,7 @@ function EventEditorTimes({
           <div>
             <Editor.Label htmlFor='endAction'>End Action</Editor.Label>
             <Select
-              value={multiEdit?.endActionIndeterminate ? null : endAction}
+              value={endActionIndeterminate ? null : endAction}
               onValueChange={(value: EndAction | null) => {
                 if (value === null) return;
                 handleSubmit('endAction', value);
@@ -169,16 +169,16 @@ function EventEditorTimes({
                 id='countToEnd'
                 checked={countToEnd}
                 onCheckedChange={(value) => {
-                  if (multiEdit?.countToEndIndeterminate) {
-                    handleSubmit('countToEnd', multiEdit.countToEndTally.majority);
+                  if (countToEndIndeterminate && merged) {
+                    handleSubmit('countToEnd', merged.countToEndTally.majority);
                   } else {
                     handleSubmit('countToEnd', value);
                   }
                 }}
-                indeterminate={multiEdit?.countToEndIndeterminate}
+                indeterminate={countToEndIndeterminate}
               />
-              {multiEdit
-                ? switchLabel(multiEdit.countToEndTally, multiEdit.countToEndIndeterminate, countToEnd)
+              {merged
+                ? switchLabel(merged.countToEndTally, countToEndIndeterminate, countToEnd)
                 : countToEnd
                   ? 'On'
                   : 'Off'}
@@ -201,7 +201,7 @@ function EventEditorTimes({
           <div>
             <Editor.Label htmlFor='timerType'>Timer Type</Editor.Label>
             <Select
-              value={multiEdit?.timerTypeIndeterminate ? null : timerType}
+              value={timerTypeIndeterminate ? null : timerType}
               onValueChange={(value: TimerType | null) => {
                 if (value === null) return;
                 handleSubmit('timerType', value);
@@ -217,8 +217,8 @@ function EventEditorTimes({
                 id='timeWarning'
                 name='timeWarning'
                 submitHandler={handleSubmit}
-                time={multiEdit?.timeWarningIndeterminate ? undefined : timeWarning}
-                placeholder={multiEdit?.timeWarningIndeterminate ? 'multiple' : 'Duration'}
+                time={timeWarningIndeterminate ? undefined : timeWarning}
+                placeholder={timeWarningIndeterminate ? 'multiple' : 'Duration'}
               />
             </div>
             <div>
@@ -227,8 +227,8 @@ function EventEditorTimes({
                 id='timeDanger'
                 name='timeDanger'
                 submitHandler={handleSubmit}
-                time={multiEdit?.timeDangerIndeterminate ? undefined : timeDanger}
-                placeholder={multiEdit?.timeDangerIndeterminate ? 'multiple' : 'Duration'}
+                time={timeDangerIndeterminate ? undefined : timeDanger}
+                placeholder={timeDangerIndeterminate ? 'multiple' : 'Duration'}
               />
             </div>
           </div>

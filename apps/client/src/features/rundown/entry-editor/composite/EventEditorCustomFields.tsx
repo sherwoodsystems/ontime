@@ -1,9 +1,9 @@
-import { CSSProperties, Fragment } from 'react';
+import { CSSProperties, Fragment, useMemo } from 'react';
 import { CustomFields, OntimeEvent, OntimeGroup, OntimeMilestone } from 'ontime-types';
 
 import { getAccessibleColour } from '../../../../common/utils/styleUtils';
 import { EventEditorUpdateFields } from '../EventEditor';
-import { isIndeterminate, MergedCustomFields } from '../multi-edit/multiEditUtils';
+import { isIndeterminate, mergeCustomFields } from '../multi-edit/multiEditUtils';
 
 import EventEditorImage from './EventEditorImage';
 import EventTextArea from './EventTextArea';
@@ -15,15 +15,22 @@ interface EntryEditorCustomFieldsProps {
   fields: CustomFields;
   entry: OntimeEvent | OntimeGroup | OntimeMilestone;
   handleSubmit: (field: EventEditorUpdateFields, value: string) => void;
-  mergedCustom?: MergedCustomFields;
+  selectedEvents?: OntimeEvent[];
 }
 
 export default function EntryEditorCustomFields({
   fields: customFields,
   handleSubmit,
   entry,
-  mergedCustom,
+  selectedEvents,
 }: EntryEditorCustomFieldsProps) {
+  const isMulti = selectedEvents != null && selectedEvents.length > 1;
+
+  const mergedCustom = useMemo(() => {
+    if (!isMulti) return null;
+    return mergeCustomFields(selectedEvents);
+  }, [isMulti, selectedEvents]);
+
   return (
     <Fragment>
       {Object.keys(customFields).map((fieldKey) => {
@@ -33,7 +40,6 @@ export default function EntryEditorCustomFields({
         const labelText = customFields[fieldKey].label;
         const labelStyle = { '--decorator-bg': backgroundColor, '--decorator-color': color } as CSSProperties;
 
-        // When mergedCustom is provided, derive value/placeholder from it
         let initialValue: string;
         let placeholder: string | undefined;
         let indeterminate = false;

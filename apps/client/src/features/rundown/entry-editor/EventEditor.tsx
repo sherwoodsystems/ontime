@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { OntimeEvent, TimeStrategy } from 'ontime-types';
 import { parseUserTime } from 'ontime-utils';
 
@@ -14,31 +14,26 @@ import EntryEditorCustomFields from './composite/EventEditorCustomFields';
 import EventEditorTimes from './composite/EventEditorTimes';
 import EventEditorTitles from './composite/EventEditorTitles';
 import EventEditorTriggers from './composite/EventEditorTriggers';
-import { isIndeterminate, MergedEvent } from './multi-edit/multiEditUtils';
-import { resolveMergedValues } from './multi-edit/resolveMergedValues';
 
 import style from './EntryEditor.module.scss';
 
 // any of the titles + colour + custom field labels
 export type EventEditorUpdateFields = 'cue' | 'title' | 'note' | 'colour' | string;
 
-interface MultiEditConfig {
-  merged: MergedEvent;
-  selectedIds: string[];
-}
-
 interface EventEditorProps {
   event: OntimeEvent;
-  multiEdit?: MultiEditConfig;
+  selectedEvents?: OntimeEvent[];
+  selectedIds?: string[];
+  firstRundownEventId?: string;
 }
 
-export default function EventEditor({ event, multiEdit }: EventEditorProps) {
+export default function EventEditor({ event, selectedEvents, selectedIds, firstRundownEventId }: EventEditorProps) {
   const { data: customFields } = useCustomFields();
   const { updateEntry, batchUpdateEvents } = useEntryActionsContext();
   const [pendingStrategy, setPendingStrategy] = useState<TimeStrategy | null>(null);
 
   const isEditor = window.location.pathname.includes('editor');
-  const isMulti = !!multiEdit;
+  const isMulti = selectedEvents != null && selectedEvents.length > 1;
 
   // Single-event handleSubmit (used when no multiEdit)
   const singleHandleSubmit = useCallback(
@@ -56,31 +51,35 @@ export default function EventEditor({ event, multiEdit }: EventEditorProps) {
   // Multi-event handleSubmit
   const multiHandleSubmit = useCallback(
     (field: string, value: string | boolean) => {
-      if (!multiEdit) return;
+      if (!selectedIds) return;
       if (field.startsWith('custom-')) {
         const fieldKey = field.split('custom-')[1];
-        batchUpdateEvents({ custom: { [fieldKey]: value } } as Partial<OntimeEvent>, multiEdit.selectedIds);
+        batchUpdateEvents({ custom: { [fieldKey]: value } } as Partial<OntimeEvent>, selectedIds);
       } else if (field === 'duration' || field === 'timeWarning' || field === 'timeDanger') {
         const ms = parseUserTime(value as string);
-        batchUpdateEvents({ [field]: ms } as Partial<OntimeEvent>, multiEdit.selectedIds);
+        batchUpdateEvents({ [field]: ms } as Partial<OntimeEvent>, selectedIds);
       } else {
-        batchUpdateEvents({ [field]: value } as Partial<OntimeEvent>, multiEdit.selectedIds);
+        batchUpdateEvents({ [field]: value } as Partial<OntimeEvent>, selectedIds);
       }
     },
-    [batchUpdateEvents, multiEdit],
+    [batchUpdateEvents, selectedIds],
   );
 
   const handleConfirmStrategy = useCallback(() => {
-    if (pendingStrategy && multiEdit) {
-      batchUpdateEvents({ timeStrategy: pendingStrategy }, multiEdit.selectedIds);
+    if (pendingStrategy && selectedIds) {
+      batchUpdateEvents({ timeStrategy: pendingStrategy }, selectedIds);
     }
     setPendingStrategy(null);
-  }, [batchUpdateEvents, multiEdit, pendingStrategy]);
+  }, [batchUpdateEvents, selectedIds, pendingStrategy]);
 
   const handleSubmit = isMulti ? multiHandleSubmit : singleHandleSubmit;
 
-  const merged = multiEdit?.merged;
-  const resolved = resolveMergedValues(event, merged);
+  // Derive resolved values for single-event display
+  const resolvedDuration = useMemo(() => {
+    if (!isMulti) return event.duration;
+    // For multi-edit, duration merging happens in TimeInputFlow
+    return event.duration;
+  }, [isMulti, event.duration]);
 
   return (
     <div className={style.content}>
@@ -89,54 +88,30 @@ export default function EventEditor({ event, multiEdit }: EventEditorProps) {
         eventId={event.id}
         timeStart={event.timeStart}
         timeEnd={event.timeEnd}
-        duration={resolved.duration}
+        duration={resolvedDuration}
         timeStrategy={event.timeStrategy}
-        linkStart={resolved.linkStart}
-        countToEnd={resolved.countToEnd}
+        linkStart={event.linkStart}
+        countToEnd={event.countToEnd}
         delay={event.delay}
-        endAction={resolved.endAction}
-        timerType={resolved.timerType}
-        timeWarning={resolved.timeWarning}
-        timeDanger={resolved.timeDanger}
+        endAction={event.endAction}
+        timerType={event.timerType}
+        timeWarning={event.timeWarning}
+        timeDanger={event.timeDanger}
         onSubmit={isMulti ? multiHandleSubmit : undefined}
-        multiEdit={
-          merged
-            ? {
-                endActionIndeterminate: isIndeterminate(merged.endAction),
-                countToEndIndeterminate: isIndeterminate(merged.countToEnd),
-                countToEndTally: merged.countToEndTally,
-                timerTypeIndeterminate: isIndeterminate(merged.timerType),
-                timeWarningIndeterminate: isIndeterminate(merged.timeWarning),
-                timeDangerIndeterminate: isIndeterminate(merged.timeDanger),
-                linkStartIndeterminate: isIndeterminate(merged.linkStart),
-                durationLockIndeterminate: isIndeterminate(merged.timeStrategy),
-                allLockDuration: merged.allLockDuration,
-                allLockEnd: merged.allLockEnd,
-              }
-            : undefined
-        }
+        selectedEvents={selectedEvents}
+        firstRundownEventId={firstRundownEventId}
         onStrategyChange={isMulti ? setPendingStrategy : undefined}
       />
       <EventEditorTitles
         key={`${event.id}-titles`}
         eventId={event.id}
         cue={event.cue}
-        flag={resolved.flag}
-        title={resolved.title}
-        note={resolved.note}
-        colour={resolved.colour}
-        titlePlaceholder={resolved.titlePlaceholder}
-        notePlaceholder={resolved.notePlaceholder}
+        flag={event.flag}
+        title={event.title}
+        note={event.note}
+        colour={event.colour}
         onSubmit={isMulti ? multiHandleSubmit : undefined}
-        multiEdit={
-          merged
-            ? {
-                flagIndeterminate: isIndeterminate(merged.flag),
-                flagTally: merged.flagTally,
-                colourIndeterminate: resolved.colourIndeterminate,
-              }
-            : undefined
-        }
+        selectedEvents={selectedEvents}
       />
       <div className={style.column}>
         <Editor.Title>
@@ -147,7 +122,7 @@ export default function EventEditor({ event, multiEdit }: EventEditorProps) {
           fields={customFields}
           handleSubmit={handleSubmit}
           entry={event}
-          mergedCustom={merged?.custom}
+          selectedEvents={selectedEvents}
         />
       </div>
       <div className={style.column}>

@@ -1,7 +1,7 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { FaQuestion } from 'react-icons/fa6';
 import { IoAlertCircleOutline, IoLink, IoLockClosed, IoLockOpenOutline, IoUnlink } from 'react-icons/io5';
-import { TimeField, TimeStrategy } from 'ontime-types';
+import { OntimeEvent, TimeField, TimeStrategy } from 'ontime-types';
 import { dayInMs } from 'ontime-utils';
 
 import IconButton from '../../../common/components/buttons/IconButton';
@@ -9,17 +9,11 @@ import * as Editor from '../../../common/components/editor-utils/EditorUtils';
 import TimeInput from '../../../common/components/input/time-input/TimeInput';
 import Tooltip from '../../../common/components/tooltip/Tooltip';
 import { useEntryActionsContext } from '../../../common/context/EntryActionsContext';
+import { deriveAllLockDuration, deriveAllLockEnd, isIndeterminate, mergeField, mergeLinkStart } from '../entry-editor/multi-edit/multiEditUtils';
 
 import TimeInputGroup from './TimeInputGroup';
 
 import style from './TimeInputFlow.module.scss';
-
-interface TimeInputFlowMultiEdit {
-  linkStartIndeterminate: boolean;
-  durationLockIndeterminate: boolean;
-  allLockDuration: boolean;
-  allLockEnd: boolean;
-}
 
 interface TimeInputFlowProps {
   eventId: string;
@@ -32,7 +26,8 @@ interface TimeInputFlowProps {
   delay: number;
   showLabels?: boolean;
   handleSubmit?: (field: string, value: string | boolean) => void;
-  multiEdit?: TimeInputFlowMultiEdit;
+  selectedEvents?: OntimeEvent[];
+  firstRundownEventId?: string;
   onStrategyChange?: (strategy: TimeStrategy) => void;
 }
 
@@ -48,10 +43,27 @@ function TimeInputFlow({
   delay,
   showLabels,
   handleSubmit: handleSubmitProp,
-  multiEdit,
+  selectedEvents,
+  firstRundownEventId,
   onStrategyChange,
 }: TimeInputFlowProps) {
   const { updateEntry, updateTimer } = useEntryActionsContext();
+
+  const isMulti = selectedEvents != null && selectedEvents.length > 1;
+
+  const merged = useMemo(() => {
+    if (!isMulti) return null;
+    const mergedTimeStrategy = mergeField(selectedEvents, 'timeStrategy');
+    const mergedLinkStart = mergeLinkStart(selectedEvents, firstRundownEventId);
+    return {
+      timeStrategy: mergedTimeStrategy,
+      linkStart: mergedLinkStart,
+      linkStartIndeterminate: isIndeterminate(mergedLinkStart),
+      durationLockIndeterminate: isIndeterminate(mergedTimeStrategy),
+      allLockDuration: deriveAllLockDuration(mergedTimeStrategy),
+      allLockEnd: deriveAllLockEnd(mergedTimeStrategy),
+    };
+  }, [isMulti, selectedEvents, firstRundownEventId]);
 
   // In sync with EventEditorTimes
   const handleTimeSubmit = (field: TimeField, value: string) => {
@@ -88,8 +100,8 @@ function TimeInputFlow({
   }
 
   const hasDelay = delay !== 0;
-  const isLockedEnd = multiEdit ? multiEdit.allLockEnd : timeStrategy === TimeStrategy.LockEnd;
-  const isLockedDuration = multiEdit ? multiEdit.allLockDuration : timeStrategy === TimeStrategy.LockDuration;
+  const isLockedEnd = merged ? merged.allLockEnd : timeStrategy === TimeStrategy.LockEnd;
+  const isLockedDuration = merged ? merged.allLockDuration : timeStrategy === TimeStrategy.LockDuration;
 
   return (
     <>
@@ -97,7 +109,7 @@ function TimeInputFlow({
         {showLabels && <Editor.Label className={style.sectionTitle}>Start time</Editor.Label>}
         <Editor.Label className={style.hoverLabel}>Start</Editor.Label>
         <TimeInputGroup hasDelay={hasDelay}>
-          {multiEdit ? (
+          {isMulti ? (
             <span className={style.disabledInput}>&mdash;</span>
           ) : (
             <TimeInput
@@ -114,7 +126,7 @@ function TimeInputFlow({
             onClick={() => handleLink(!linkStart)}
             render={<IconButton variant='subtle-white' className={linkStart ? style.active : style.inactive} />}
           >
-            {multiEdit?.linkStartIndeterminate ? (
+            {merged?.linkStartIndeterminate ? (
               <FaQuestion />
             ) : (
               <span className={style.fourtyfive}>{linkStart ? <IoLink /> : <IoUnlink />}</span>
@@ -127,7 +139,7 @@ function TimeInputFlow({
         {showLabels && <Editor.Label>End time</Editor.Label>}
         <Editor.Label className={style.hoverLabel}>End</Editor.Label>
         <TimeInputGroup hasDelay={hasDelay}>
-          {multiEdit ? (
+          {isMulti ? (
             <span className={style.disabledInput}>&mdash;</span>
           ) : (
             <TimeInput
@@ -145,7 +157,7 @@ function TimeInputFlow({
             onClick={() => handleChangeStrategy(TimeStrategy.LockEnd)}
             data-testid='lock__end'
           >
-            {multiEdit?.durationLockIndeterminate ? (
+            {merged?.durationLockIndeterminate ? (
               <FaQuestion />
             ) : isLockedEnd ? (
               <IoLockClosed />
@@ -160,14 +172,14 @@ function TimeInputFlow({
         {showLabels && <Editor.Label>Duration</Editor.Label>}
         <Editor.Label className={style.hoverLabel}>Duration</Editor.Label>
         <TimeInputGroup hasDelay={hasDelay}>
-          {multiEdit && !multiEdit.allLockDuration ? (
+          {isMulti && !merged?.allLockDuration ? (
             <span className={style.disabledInput}>&mdash;</span>
           ) : (
             <TimeInput
               name='duration'
               submitHandler={handleTimeSubmit}
               time={duration}
-              placeholder={multiEdit ? 'multiple' : 'Duration'}
+              placeholder={isMulti ? 'multiple' : 'Duration'}
               align='left'
               disabled={isLockedEnd}
             />
@@ -180,7 +192,7 @@ function TimeInputFlow({
             onClick={() => handleChangeStrategy(TimeStrategy.LockDuration)}
             data-testid='lock__duration'
           >
-            {multiEdit?.durationLockIndeterminate ? (
+            {merged?.durationLockIndeterminate ? (
               <FaQuestion />
             ) : isLockedDuration ? (
               <IoLockClosed />
@@ -191,7 +203,7 @@ function TimeInputFlow({
         </TimeInputGroup>
       </div>
 
-      {!multiEdit && warnings.length > 0 && (
+      {!isMulti && warnings.length > 0 && (
         <Tooltip text={warnings.join(' - ')} className={style.timerNote} data-testid='event-warning' render={<span />}>
           <IoAlertCircleOutline />
         </Tooltip>

@@ -8,7 +8,6 @@ import {
   findFirstRundownEventId,
   INDETERMINATE,
   mergeCustomFields,
-  mergeEvents,
   mergeField,
   mergeLinkStart,
 } from '../entry-editor/multi-edit/multiEditUtils';
@@ -189,62 +188,3 @@ describe('findFirstRundownEventId()', () => {
   });
 });
 
-describe('mergeEvents()', () => {
-  it('returns null with fewer than 2 events', () => {
-    const entries: RundownEntries = { '1': makeEvent({ id: '1' }) };
-    expect(mergeEvents(entries, new Set(['1']), ['1'])).toBeNull();
-  });
-
-  it('returns null with empty selection', () => {
-    expect(mergeEvents({}, new Set(), [])).toBeNull();
-  });
-
-  it('returns shared values when events agree', () => {
-    const entries: RundownEntries = {
-      '1': makeEvent({ id: '1', title: 'Same', duration: 500 }),
-      '2': makeEvent({ id: '2', title: 'Same', duration: 500 }),
-    };
-    const result = mergeEvents(entries, new Set(['1', '2']), ['1', '2'])!;
-    expect(result.title).toBe('Same');
-    expect(result.duration).toBe(500);
-  });
-
-  it('marks differing fields as INDETERMINATE', () => {
-    const entries: RundownEntries = {
-      '1': makeEvent({ id: '1', title: 'A', colour: 'red' }),
-      '2': makeEvent({ id: '2', title: 'B', colour: 'red' }),
-    };
-    const result = mergeEvents(entries, new Set(['1', '2']), ['1', '2'])!;
-    expect(result.title).toBe(INDETERMINATE);
-    expect(result.colour).toBe('red');
-  });
-
-  it('derives lock booleans from shared timeStrategy', () => {
-    const entries: RundownEntries = {
-      '1': makeEvent({ id: '1', timeStrategy: TimeStrategy.LockEnd }),
-      '2': makeEvent({ id: '2', timeStrategy: TimeStrategy.LockEnd }),
-    };
-    const result = mergeEvents(entries, new Set(['1', '2']), ['1', '2'])!;
-    expect(result.allLockEnd).toBe(true);
-    expect(result.allLockDuration).toBe(false);
-  });
-
-  it('computes flag tally', () => {
-    const entries: RundownEntries = {
-      '1': makeEvent({ id: '1', flag: true }),
-      '2': makeEvent({ id: '2', flag: false }),
-    };
-    const result = mergeEvents(entries, new Set(['1', '2']), ['1', '2'])!;
-    expect(result.flagTally).toEqual({ onCount: 1, offCount: 1, majority: true });
-  });
-
-  it('excludes first rundown event from linkStart merge', () => {
-    const entries: RundownEntries = {
-      '1': makeEvent({ id: '1', linkStart: false }),
-      '2': makeEvent({ id: '2', linkStart: true }),
-      '3': makeEvent({ id: '3', linkStart: true }),
-    };
-    const result = mergeEvents(entries, new Set(['1', '2', '3']), ['1', '2', '3'])!;
-    expect(result.linkStart).toBe(true);
-  });
-});

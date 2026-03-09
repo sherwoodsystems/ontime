@@ -3,18 +3,18 @@ import { useMemo } from 'react';
 import useRundown from '../../../../common/hooks-query/useRundown';
 import { useEventSelection } from '../../useEventSelection';
 
-import { mergeEvents } from './multiEditUtils';
+import { filterSelectedEvents } from './multiEditUtils';
 
-export function useMultiEventMerge() {
-  const selectedEvents = useEventSelection((state) => state.selectedEvents);
+export function useSelectedEvents() {
+  const selectedEventIds = useEventSelection((state) => state.selectedEvents);
   const { data } = useRundown();
 
-  const merged = useMemo(
-    () => mergeEvents(data.entries, selectedEvents, data.flatOrder),
-    [data.entries, selectedEvents, data.flatOrder],
+  const selectedEvents = useMemo(
+    () => filterSelectedEvents(data.entries, selectedEventIds),
+    [data.entries, selectedEventIds],
   );
 
-  const selectedIds = useMemo(() => Array.from(selectedEvents), [selectedEvents]);
+  const selectedIds = useMemo(() => Array.from(selectedEventIds), [selectedEventIds]);
 
-  return { merged, selectedIds, isMultiSelect: selectedEvents.size > 1 };
+  return { selectedEvents, selectedIds, isMultiSelect: selectedEventIds.size > 1 };
 }

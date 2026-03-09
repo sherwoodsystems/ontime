@@ -28,22 +28,7 @@ export function booleanTally(events: OntimeEvent[], field: keyof OntimeEvent): B
   return { onCount, offCount, majority: onCount >= offCount };
 }
 
-/** Fields included in multi-edit v1 */
-const mergeableFields = ['title', 'note', 'colour', 'flag', 'duration', 'timeStrategy', 'endAction', 'countToEnd', 'timerType', 'timeWarning', 'timeDanger', 'linkStart'] as const;
-
-type MergeableField = (typeof mergeableFields)[number];
-
 export type MergedCustomFields = Record<string, MergedValue<string>>;
-
-export type MergedEvent = {
-  [K in MergeableField]: MergedValue<OntimeEvent[K]>;
-} & {
-  custom: MergedCustomFields;
-  allLockDuration: boolean;
-  allLockEnd: boolean;
-  flagTally: BooleanTally;
-  countToEndTally: BooleanTally;
-};
 
 /**
  * Generic single-field merge: compare all events to the first.
@@ -120,30 +105,3 @@ export function filterSelectedEvents(entries: RundownEntries, selectedIds: Set<s
   return events;
 }
 
-export function mergeEvents(entries: RundownEntries, selectedIds: Set<string>, flatOrder: EntryId[]): MergedEvent | null {
-  const events = filterSelectedEvents(entries, selectedIds);
-  if (events.length < 2) return null;
-
-  const firstRundownEventId = findFirstRundownEventId(entries, flatOrder);
-  const timeStrategy = mergeField(events, 'timeStrategy');
-
-  return {
-    title: mergeField(events, 'title'),
-    note: mergeField(events, 'note'),
-    colour: mergeField(events, 'colour'),
-    flag: mergeField(events, 'flag'),
-    duration: mergeField(events, 'duration'),
-    timeStrategy,
-    endAction: mergeField(events, 'endAction'),
-    countToEnd: mergeField(events, 'countToEnd'),
-    timerType: mergeField(events, 'timerType'),
-    timeWarning: mergeField(events, 'timeWarning'),
-    timeDanger: mergeField(events, 'timeDanger'),
-    linkStart: mergeLinkStart(events, firstRundownEventId),
-    custom: mergeCustomFields(events),
-    allLockDuration: deriveAllLockDuration(timeStrategy),
-    allLockEnd: deriveAllLockEnd(timeStrategy),
-    flagTally: booleanTally(events, 'flag'),
-    countToEndTally: booleanTally(events, 'countToEnd'),
-  };
-}
