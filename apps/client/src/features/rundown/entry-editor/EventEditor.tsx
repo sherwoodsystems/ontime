@@ -92,6 +92,7 @@ export default function EventEditor({ event, selectedEvents, selectedIds, firstR
         timeStrategy={event.timeStrategy}
         linkStart={event.linkStart}
         countToEnd={event.countToEnd}
+        breakRoll={event.breakRoll ?? false}
         delay={event.delay}
         endAction={event.endAction}
         timerType={event.timerType}

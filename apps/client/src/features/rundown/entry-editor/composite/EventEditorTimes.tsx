@@ -23,6 +23,7 @@ interface EventEditorTimesProps {
   timeStrategy: TimeStrategy;
   linkStart: boolean;
   countToEnd: boolean;
+  breakRoll: boolean;
   delay: number;
   endAction: EndAction;
   timerType: TimerType;
@@ -34,7 +35,7 @@ interface EventEditorTimesProps {
   onStrategyChange?: (strategy: TimeStrategy) => void;
 }
 
-type HandledActions = 'countToEnd' | 'timerType' | 'endAction' | 'timeWarning' | 'timeDanger';
+type HandledActions = 'countToEnd' | 'breakRoll' | 'timerType' | 'endAction' | 'timeWarning' | 'timeDanger';
 
 export default memo(EventEditorTimes);
 function EventEditorTimes({
@@ -45,6 +46,7 @@ function EventEditorTimes({
   timeStrategy,
   linkStart,
   countToEnd,
+  breakRoll,
   delay,
   endAction,
   timerType,
@@ -85,6 +87,11 @@ function EventEditorTimes({
 
     if (field === 'countToEnd') {
       updateEntry({ id: eventId, countToEnd: value as boolean });
+      return;
+    }
+
+    if (field === 'breakRoll') {
+      updateEntry({ id: eventId, breakRoll: value as boolean });
       return;
     }
 
@@ -150,7 +157,7 @@ function EventEditorTimes({
 
       <div className={style.column}>
         <Editor.Title>Event Behaviour</Editor.Title>
-        <div className={style.splitTwo}>
+        <div className={style.splitThree}>
           <div>
             <Editor.Label htmlFor='endAction'>End Action</Editor.Label>
             <Select
@@ -163,7 +170,12 @@ function EventEditorTimes({
             />
           </div>
           <div>
-            <Editor.Label htmlFor='countToEnd'>Count to End</Editor.Label>
+            <Editor.Label htmlFor='countToEnd'>
+              <Tooltip text='When enabled, the timer counts down to the scheduled end time instead of counting down from the event duration.' render={<span />}>
+                Count to End
+                <IoInformationCircle className={style.tooltipIcon} />
+              </Tooltip>
+            </Editor.Label>
             <Editor.Label className={style.switchLabel}>
               <Switch
                 id='countToEnd'
@@ -182,6 +194,22 @@ function EventEditorTimes({
                 : countToEnd
                   ? 'On'
                   : 'Off'}
+            </Editor.Label>
+          </div>
+          <div>
+            <Editor.Label htmlFor='breakRoll'>
+              <Tooltip text='When enabled, this event will break out of roll mode and return to normal playback. End actions will take effect, even in roll mode.' render={<span />}>
+                Break Roll
+                <IoInformationCircle className={style.tooltipIcon} />
+              </Tooltip>
+            </Editor.Label>
+            <Editor.Label className={style.switchLabel}>
+              <Switch
+                id='breakRoll'
+                checked={breakRoll}
+                onCheckedChange={(value) => handleSubmit('breakRoll', value)}
+              />
+              {breakRoll ? 'On' : 'Off'}
             </Editor.Label>
           </div>
         </div>
