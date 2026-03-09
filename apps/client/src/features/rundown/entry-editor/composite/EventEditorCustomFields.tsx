@@ -47,7 +47,7 @@ export default function EntryEditorCustomFields({
         if (mergedCustom) {
           const mergedValue = mergedCustom[fieldKey];
           indeterminate = isIndeterminate(mergedValue);
-          initialValue = indeterminate ? '' : (mergedValue ?? '');
+          initialValue = indeterminate ? '' : ((mergedValue as string) ?? '');
           placeholder = indeterminate ? 'multiple' : undefined;
         } else {
           initialValue = entry.custom[fieldKey] ?? '';

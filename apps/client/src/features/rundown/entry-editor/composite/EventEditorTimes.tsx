@@ -108,14 +108,14 @@ function EventEditorTimes({
     : '';
 
   const endActionOptions = [
-    ...(endActionIndeterminate ? [{ value: null, label: 'Mixed' }] : []),
+    ...(endActionIndeterminate ? [{ value: null as unknown as EndAction, label: 'Mixed' }] : []),
     { value: EndAction.None, label: 'None' },
     { value: EndAction.LoadNext, label: 'Load next event' },
     { value: EndAction.PlayNext, label: 'Play next event' },
   ];
 
   const timerTypeOptions = [
-    ...(timerTypeIndeterminate ? [{ value: null, label: 'Mixed' }] : []),
+    ...(timerTypeIndeterminate ? [{ value: null as unknown as TimerType, label: 'Mixed' }] : []),
     { value: TimerType.CountDown, label: 'Count down' },
     { value: TimerType.CountUp, label: 'Count up' },
     { value: TimerType.Clock, label: 'Clock' },
