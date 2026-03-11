@@ -66,15 +66,18 @@ function EventEditorTimes({
     return {
       endAction: mergeField(selectedEvents, 'endAction'),
       countToEnd: mergeField(selectedEvents, 'countToEnd'),
+      breakRoll: mergeField(selectedEvents, 'breakRoll'),
       timerType: mergeField(selectedEvents, 'timerType'),
       timeWarning: mergeField(selectedEvents, 'timeWarning'),
       timeDanger: mergeField(selectedEvents, 'timeDanger'),
       countToEndTally: booleanTally(selectedEvents, 'countToEnd'),
+      breakRollTally: booleanTally(selectedEvents, 'breakRoll'),
     };
   }, [isMulti, selectedEvents]);
 
   const endActionIndeterminate = merged ? isIndeterminate(merged.endAction) : false;
   const countToEndIndeterminate = merged ? isIndeterminate(merged.countToEnd) : false;
+  const breakRollIndeterminate = merged ? isIndeterminate(merged.breakRoll) : false;
   const timerTypeIndeterminate = merged ? isIndeterminate(merged.timerType) : false;
   const timeWarningIndeterminate = merged ? isIndeterminate(merged.timeWarning) : false;
   const timeDangerIndeterminate = merged ? isIndeterminate(merged.timeDanger) : false;
@@ -207,9 +210,20 @@ function EventEditorTimes({
               <Switch
                 id='breakRoll'
                 checked={breakRoll}
-                onCheckedChange={(value) => handleSubmit('breakRoll', value)}
+                onCheckedChange={(value) => {
+                  if (breakRollIndeterminate && merged) {
+                    handleSubmit('breakRoll', merged.breakRollTally.majority);
+                  } else {
+                    handleSubmit('breakRoll', value);
+                  }
+                }}
+                indeterminate={breakRollIndeterminate}
               />
-              {breakRoll ? 'On' : 'Off'}
+              {merged
+                ? switchLabel(merged.breakRollTally, breakRollIndeterminate, breakRoll)
+                : breakRoll
+                  ? 'On'
+                  : 'Off'}
             </Editor.Label>
           </div>
         </div>

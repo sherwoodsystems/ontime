@@ -21,6 +21,7 @@ function makeEvent(overrides: Partial<OntimeEvent> & { id: string }): OntimeEven
     colour: '',
     flag: false,
     countToEnd: false,
+    breakRoll: false,
     linkStart: false,
     skip: false,
     endAction: 'none',
@@ -112,6 +113,32 @@ describe('booleanTally()', () => {
   it('more off than on', () => {
     const events = [makeEvent({ id: '1', flag: true }), makeEvent({ id: '2', flag: false }), makeEvent({ id: '3', flag: false })];
     expect(booleanTally(events, 'flag')).toEqual({ onCount: 1, offCount: 2, majority: false });
+  });
+});
+
+describe('breakRoll multi-edit', () => {
+  it('mergeField returns shared breakRoll value', () => {
+    const events = [makeEvent({ id: '1', breakRoll: true }), makeEvent({ id: '2', breakRoll: true })];
+    expect(mergeField(events, 'breakRoll')).toBe(true);
+  });
+
+  it('mergeField returns INDETERMINATE for differing breakRoll', () => {
+    const events = [makeEvent({ id: '1', breakRoll: true }), makeEvent({ id: '2', breakRoll: false })];
+    expect(mergeField(events, 'breakRoll')).toBe(INDETERMINATE);
+  });
+
+  it('booleanTally counts breakRoll correctly', () => {
+    const events = [
+      makeEvent({ id: '1', breakRoll: true }),
+      makeEvent({ id: '2', breakRoll: false }),
+      makeEvent({ id: '3', breakRoll: false }),
+    ];
+    expect(booleanTally(events, 'breakRoll')).toEqual({ onCount: 1, offCount: 2, majority: false });
+  });
+
+  it('booleanTally handles undefined breakRoll as false', () => {
+    const events = [makeEvent({ id: '1' }), makeEvent({ id: '2', breakRoll: true })];
+    expect(booleanTally(events, 'breakRoll')).toEqual({ onCount: 1, offCount: 1, majority: true });
   });
 });
 
